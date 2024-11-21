@@ -1,19 +1,20 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
-	"syscall"
-	"bufio"
 	"strconv"
-	"io/ioutil"
 	"strings"
-	"time"
-	"fmt"
 	"sync"
-	"encoding/json"
+	"syscall"
+	"time"
+
 	"github.com/elazarl/goproxy"
 
 	"golang.org/x/time/rate"
@@ -25,7 +26,7 @@ var (
 	limiter = rate.NewLimiter(70, 70)
 	limitDir string
 	limiterTable = make(map[string]*rate.Limiter)
-	global_config_path = "/home/master_artifact/TopFull/online_boutique_scripts/src/global_config.json"
+	global_config_path = os.Getenv("GLOBAL_CONFIG_PATH")
 	global_config Config
 	mapStats = make(map[string]*StatsModule)
 	globalLock *sync.Mutex
@@ -114,6 +115,7 @@ func init() {
 
 
 	globalLock = &sync.Mutex{}
+
 }
 
 func monitorRPS() {

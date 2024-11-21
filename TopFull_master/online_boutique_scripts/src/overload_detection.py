@@ -1,7 +1,8 @@
-from fetch_istio import *
+# from fetch_istio import *
 from admission_controller import kubeAPI
 from resource_collector import *
 
+import os
 import sys
 import json
 import subprocess
@@ -48,6 +49,13 @@ business_priority = {
 #     'query_payment': 0
 # }
 
+# Hotel Reservation
+# business_priority = {
+#     'user': 0,
+#     'search': 0,
+#     'reserve': 0,
+#     'recommend': 0,
+# }
 
 def apply_threshold_proxy(apis, test=False):
     total = 0
@@ -523,11 +531,11 @@ class Detector:
 
 
 def main():
-    proxies = {
-        'http': 'http://egg3.kaist.ac.kr:8090'
-    }
-    url = "http://egg3.kaist.ac.kr:8090/thresholds"
-    response = requests.get(url, proxies=proxies)
+    # proxies = {
+    #     'http': 'http://egg3.kaist.ac.kr:8090'
+    # }
+    # url = "http://egg3.kaist.ac.kr:8090/thresholds"
+    # response = requests.get(url, proxies=proxies)
     d = Detector()
     print(d.current_rps())
     quit()

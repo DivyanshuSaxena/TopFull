@@ -37,6 +37,13 @@ class Collector:
                 ("GET", "query_contact", 8090),
                 ("POST", "query_payment", 8090)
             ]
+        elif code == "hotel_reservation":
+            self.code = [
+                ("GET", "user", 8089),
+                ("GET", "search", 8089),
+                ("GET", "recommend", 8089),
+                ("POST", "reserve", 8089)
+            ]
         else:
             self.code = code
 
@@ -78,17 +85,6 @@ class Collector:
             result[name] = (result[name][0], result[name][1], result[name][2])
             # result[name] = (result[name][0], result[name][1], result[name][2], result[name][3])
         return result
-
-    
-    def query_latency(self, api):
-        response = requests.get(f"http://honey3.kaist.ac.kr:8089/stats/requests")
-        data = response.json()
-        stats = data["stats"]
-
-        method, path, _ = self.code[api]
-        for stat in stats:
-            if method == stat["method"] and path in stat["name"]:
-                return data['current_response_time_percentile_95']
 
 
 def record_train_ticket():
