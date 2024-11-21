@@ -11,8 +11,7 @@ with open(global_config_path, "r") as f:
     global_config = json.load(f)
 
 class Collector:
-    def __init__(self, hostname="http://honey3.kaist.ac.kr:8089/stats/requests", code="online_boutique"):
-        self.hostname = hostname
+    def __init__(self, code="online_boutique"):
         if code == "online_boutique":
             self.code = [
                 ("GET", "getcart", 8888),

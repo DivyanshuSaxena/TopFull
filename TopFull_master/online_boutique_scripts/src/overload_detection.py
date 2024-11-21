@@ -1,4 +1,3 @@
-# from fetch_istio import *
 from admission_controller import kubeAPI
 from resource_collector import *
 
