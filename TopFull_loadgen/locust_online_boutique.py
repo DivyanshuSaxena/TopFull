@@ -248,13 +248,12 @@ req_stat={}
 def request_handler(request_type, name, response_time, succ=True):
     mapStats[name].log_request(succ, response_time)
 
-@events.request_success.add_listener
-def mySuccessHandler(request_type, name, response_time, response_length, **kw):
-    request_handler(request_type, name, response_time, succ=True)
-
-@events.request_failure.add_listener
-def myFailureHandler(request_type, name, response_time, response_length, **kw):
-    request_handler(request_type, name, response_time, succ=False)
+@events.request.add_listener
+def myRequestHandler(request_type, name, response_time, response_length, exception, **kw):
+    if exception:
+        request_handler(request_type, name, response_time, succ=False)
+    else:
+        request_handler(request_type, name, response_time, succ=True)
 
 @events.test_stop.add_listener
 def myTestStop(environment):
@@ -290,7 +289,7 @@ class WebsiteUser(HttpUser):
     wait_time = constant_throughput(1)
 
     def on_start(self):
-        self.client.proxies = {"http": "http://10.8.0.4:8090"}
+        self.client.proxies = {"http": "http://10.10.1.1:8090"}
         self.client.verify = False
     
     @tag('postcheckout')

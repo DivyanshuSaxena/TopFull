@@ -135,11 +135,16 @@ echo "Configuring dependencies for $CONTROL_NODE"
 ssh ${CONTROL_PORT_SSH} -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-session -d -s config \"
   cd \$HOME &&
   sudo apt-get update &&
-  
+  sudo apt-get install -y jq &&
+
+  pushd \$HOME/TopFull_master/online_boutique_scripts/cadvisor &&
+  kubectl kustomize deploy/kubernetes/base | kubectl apply -f - &&
+  popd &&
+
   curl https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py &&
   python3 get-pip.py &&
   python3 -m pip install -r \$HOME/TopFull_master/requirements.txt &&
-  
+
   wget https://go.dev/dl/go1.20.7.linux-amd64.tar.gz &&
   sudo rm -rf /usr/local/go && sudo tar -C /usr/local -xzf go1.20.7.linux-amd64.tar.gz &&
   echo 'export PATH=\$PATH:/usr/local/go/bin' >> ~/.bashrc &&

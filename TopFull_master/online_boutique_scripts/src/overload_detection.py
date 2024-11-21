@@ -2,12 +2,13 @@ from fetch_istio import *
 from admission_controller import kubeAPI
 from resource_collector import *
 
+import sys
 import json
 import subprocess
 import random
 import threading
 
-global_config_path = "/home/topfull-master/TopFull/TopFull_master/online_boutique_scripts/src/global_config.json"
+global_config_path = os.environ["GLOBAL_CONFIG_PATH"]
 with open(global_config_path, "r") as f:
     global_config = json.load(f)
 

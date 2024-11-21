@@ -458,9 +458,10 @@ def getStats_v4_two(port=8080):
         out2, err, ret = exec_command('kubectl get pod -n cadvisor -ojsonpath=\'{.items[1].status.podIP}\'')
         out3, err, ret = exec_command('kubectl get pod -n cadvisor -ojsonpath=\'{.items[2].status.podIP}\'')
         out4, err, ret = exec_command('kubectl get pod -n cadvisor -ojsonpath=\'{.items[3].status.podIP}\'')
-        out5, err, ret = exec_command('kubectl get pod -n cadvisor -ojsonpath=\'{.items[4].status.podIP}\'')
+        # out5, err, ret = exec_command('kubectl get pod -n cadvisor -ojsonpath=\'{.items[4].status.podIP}\'')
 
-        return [out1.decode('utf-8'), out2.decode('utf-8'), out3.decode('utf-8'), out4.decode('utf-8'), out5.decode('utf-8')]
+        # return [out1.decode('utf-8'), out2.decode('utf-8'), out3.decode('utf-8'), out4.decode('utf-8'), out5.decode('utf-8')]
+        return [out1.decode('utf-8'), out2.decode('utf-8'), out3.decode('utf-8'), out4.decode('utf-8')]
     
     container_ids = getContainerId3()
 

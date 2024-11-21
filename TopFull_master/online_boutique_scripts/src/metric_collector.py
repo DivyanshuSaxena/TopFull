@@ -6,7 +6,7 @@ import csv
 import os
 
 import json
-global_config_path = "/home/topfull-master/TopFull/TopFull_master/online_boutique_scripts/src/global_config.json"
+global_config_path = os.environ["GLOBAL_CONFIG_PATH"]
 with open(global_config_path, "r") as f:
     global_config = json.load(f)
 
