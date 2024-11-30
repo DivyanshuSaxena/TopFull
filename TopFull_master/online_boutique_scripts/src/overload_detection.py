@@ -21,40 +21,43 @@ cpu_quota = 200
 
 proxy_rate_dir = global_config["proxy_dir"]
 
+microservice_code = global_config["microservice_code"]
+
 # Higher priority has larger values
-# Online Boutique
-business_priority = {
-    "postcheckout": 0,
-    "getcart": 0,
-    "postcart": 0,
-    "getproduct": 0,
-    "emptycart": 0
-}
-
-# Train Ticket
-# business_priority = {
-#     'high_speed_ticket': 0,
-#     'normal_speed_ticket': 0,
-#     'query_cheapest': 0,
-#     'query_min_station': 0,
-#     'query_quickest': 0,
-#     'query_order': 0,
-#     'query_order_other': 0,
-#     'query_route': 0,
-#     'query_food': 0,
-#     'enter_station': 0,
-#     'preserve_normal': 0,
-#     'query_contact': 0,
-#     'query_payment': 0
-# }
-
-# Hotel Reservation
-# business_priority = {
-#     'user': 0,
-#     'search': 0,
-#     'reserve': 0,
-#     'recommend': 0,
-# }
+if microservice_code == "online_boutique":
+    # Online Boutique
+    business_priority = {
+        "postcheckout": 0,
+        "getcart": 0,
+        "postcart": 0,
+        "getproduct": 0,
+        "emptycart": 0
+    }
+elif microservice_code == "train_ticket":
+    # Train Ticket
+    business_priority = {
+        'high_speed_ticket': 0,
+        'normal_speed_ticket': 0,
+        'query_cheapest': 0,
+        'query_min_station': 0,
+        'query_quickest': 0,
+        'query_order': 0,
+        'query_order_other': 0,
+        'query_route': 0,
+        'query_food': 0,
+        'enter_station': 0,
+        'preserve_normal': 0,
+        'query_contact': 0,
+        'query_payment': 0
+    }
+elif microservice_code == "hotel_reservation":
+    # Hotel Reservation
+    business_priority = {
+        'user': 0,
+        'search': 0,
+        'reserve': 0,
+        'recommend': 0,
+    }
 
 def apply_threshold_proxy(apis, test=False):
     total = 0
@@ -119,25 +122,36 @@ class Detector:
                     self.services[svc]['apis'].append(api)
 
         # Experimental Setup, it should match CPU quota unit in yaml files of benchmark applications
-        # Online Boutique
-        self.services['cartservice']['cpu'] = 1000
-        self.services['currencyservice']['cpu'] = 1000
-        self.services['frontend']['cpu'] = 1000
-        self.services['adservice']['cpu'] = 1000
-        self.services['productcatalogservice']['cpu'] = 500
-        self.services['checkoutservice']['cpu'] = 1000
-        self.services['recommendationservice']['cpu'] = 2000
-
-        # Train Ticket
-        # self.services['ts-order-service']['cpu'] = 500
-        # self.services['ts-station-service']['cpu'] = 500
-        # self.services['ts-order-other-service']['cpu'] = 500
-        # self.services['ts-travel-service']['cpu'] = 1000
-        # self.services['ts-travel2-service']['cpu'] = 500
-        # self.services['ts-contacts-service']['cpu'] = 500
-        # self.services['ts-food-service']['cpu'] = 500
-        # self.services['ts-inside-payment-service']['cpu'] = 500
-        # self.services['ts-food-map-service']['cpu'] = 1000
+        if microservice_code == "online_boutique":
+            # Online Boutique
+            self.services['cartservice']['cpu'] = 1000
+            self.services['currencyservice']['cpu'] = 1000
+            self.services['frontend']['cpu'] = 1000
+            self.services['adservice']['cpu'] = 1000
+            self.services['productcatalogservice']['cpu'] = 500
+            self.services['checkoutservice']['cpu'] = 1000
+            self.services['recommendationservice']['cpu'] = 2000
+        elif microservice_code == "train_ticket":
+            # Train Ticket
+            self.services['ts-order-service']['cpu'] = 500
+            self.services['ts-station-service']['cpu'] = 500
+            self.services['ts-order-other-service']['cpu'] = 500
+            self.services['ts-travel-service']['cpu'] = 1000
+            self.services['ts-travel2-service']['cpu'] = 500
+            self.services['ts-contacts-service']['cpu'] = 500
+            self.services['ts-food-service']['cpu'] = 500
+            self.services['ts-inside-payment-service']['cpu'] = 500
+            self.services['ts-food-map-service']['cpu'] = 1000
+        elif microservice_code == "hotel_reservation":
+            # Hotel Reservation
+            self.services['frontend']['cpu'] = 500
+            self.services['search']['cpu'] = 500
+            self.services['reservation']['cpu'] = 500
+            self.services['recommendation']['cpu'] = 500
+            self.services['user']['cpu'] = 500
+            self.services['profile']['cpu'] = 500
+            self.services['geo']['cpu'] = 500
+            self.services['rate']['cpu'] = 500
 
         return
     
@@ -152,7 +166,7 @@ class Detector:
         # Fetch CPU quota and CPU usage of all services
         result = []
         resources = self.get_cpu_util_v2(list(self.services.keys()))
-        print(resources)
+        print("Resource usage: ", resources)
         for svc in list(resources.keys()):
             usage = resources[svc]
             quota = self.services[svc]['cpu']

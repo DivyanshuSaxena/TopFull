@@ -139,7 +139,7 @@ def record_train_ticket():
                 w2.writerow(thresholds)
 
             
-def record_online_boutique():
+def record_all():
     c = Collector(code=global_config["microservice_code"])
     apis = global_config["record_target"]
     log_path = global_config["record_path"]
@@ -194,4 +194,4 @@ def record_online_boutique():
 
 import csv
 if __name__ == "__main__":
-    record_online_boutique()
+    record_all()

@@ -1,0 +1,13 @@
+{
+    "checkpoint_path": "/users/dsaxena/TopFull_master/online_boutique_scripts/src/checkpoint_000701",
+    "microservice_code": "online_boutique",
+    "proxy_dir": "/users/dsaxena/TopFull_master/online_boutique_scripts/src/proxy/",
+    "microservice_configuration": "/users/dsaxena/TopFull_master/online_boutique_scripts/src/config/online_boutique.json",
+    "proxy_url": "http://10.10.1.1:8090",
+    "locust_url": "http://10.10.1.5",
+    "locust_port": 43,
+    "record_target": ["getcart", "getproduct", "postcheckout", "postcart", "emptycart"],
+    "record_path": "/users/dsaxena/TopFull_master/online_boutique_scripts/src/logs",
+    "num_instance_path": "/users/dsaxena/TopFull_master/online_boutique_scripts/src/logs/num_agent.csv",
+    "frontend_url": "10.10.1.1:30440"
+}
