@@ -1,4 +1,4 @@
-from locust import FastHttpUser, LoadTestShape, task, events
+from locust import FastHttpUser, HttpUser, LoadTestShape, task, events
 import locust.stats
 import random
 import logging
@@ -32,11 +32,15 @@ mean_iat = 1  # seconds
 request_log_file = open("request.log", "a")
 
 
-class SocialMediaUser(FastHttpUser):
+class SocialMediaUser(HttpUser):
     # return wait time in second
     def wait_time(self):
         global mean_iat
         return random.expovariate(lambd=1 / mean_iat)
+
+    def on_start(self):
+        self.client.proxies = {"http": "http://10.10.1.1:8090"}
+        self.client.verify = False
 
     @events.request.add_listener
     def on_request(response_time, context, **kwargs):
@@ -80,7 +84,7 @@ class SocialMediaUser(FastHttpUser):
             + str(lon)
         )
 
-        self.client.get(path, name="search_hotel", context={"type": "search_hotel"})
+        self.client.get(path, name="search")
 
     @task(390)
     def recommend(self):
@@ -157,7 +161,7 @@ class SocialMediaUser(FastHttpUser):
         user_name, password = get_user()
         path = "/user?username=" + user_name + "&password=" + password
 
-        self.client.get(path, name="user_login", context={"type": "user_login"})
+        self.client.get(path, name="user", context={"type": "user_login"})
 
 
 RPS = list(map(int, Path("rps.txt").read_text().splitlines()))

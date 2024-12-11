@@ -1,0 +1,21 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package galileo;
+
+service LatencyCollector {
+  rpc CollectLatency (LatencyRequest) returns (LatencyResponse) {}
+  rpc EndCollector (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+}
+
+message LatencyRequest {
+  int32 period = 1;
+}
+
+message LatencyResponse {
+  repeated LatencyData data = 1;
+}
+
+message LatencyData {
+  string type = 1;
+  repeated float latencies = 2;
+}
