@@ -33,7 +33,7 @@ gast==0.4.0
 google-auth==2.7.0
 google-auth-oauthlib
 google-pasta==0.2.0
-grpcio
+grpcio==1.43.0
 gym==0.23.1
 gym-notices==0.0.8
 gymnasium==0.28.1
