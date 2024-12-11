@@ -65,6 +65,10 @@ for i in "${!HOSTS[@]}"; do
     make -j 4 &&
     popd &&
 
+    pushd TopFull_loadgen &&
+    python3 -m grpc_tools.protoc -I=. --python_out=. --grpc_python_out=. protos/collector.proto &&
+    popd &&
+
     mkdir -p \$HOME/out &&
     mkdir -p \$HOME/logs\""
 

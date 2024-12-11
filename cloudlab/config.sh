@@ -143,6 +143,7 @@ ssh ${CONTROL_PORT_SSH} -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-sess
 
   curl https://bootstrap.pypa.io/pip/3.6/get-pip.py -o get-pip.py &&
   python3 get-pip.py &&
+  python3 -m pip install --upgrade pip &&
   python3 -m pip install -r \$HOME/TopFull_master/requirements.txt &&
 
   wget https://go.dev/dl/go1.20.7.linux-amd64.tar.gz &&
