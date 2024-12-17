@@ -131,6 +131,9 @@ rm admin.conf
 # After joining the nodes, make a rollout restart of coredns on control node.
 ssh ${CONTROL_PORT_SSH} -o StrictHostKeyChecking=no ${CONTROL_NODE} "kubectl -n kube-system rollout restart deployment coredns"
 
+# Also install kubernetes metrics server
+ssh ${CONTROL_PORT_SSH} -o StrictHostKeyChecking=no ${CONTROL_NODE} "kubectl apply -f \$HOME/TopFull_master/online_boutique_scripts/deployments/metric-server-latest.yaml"
+
 echo "Configuring dependencies for $CONTROL_NODE"
 ssh ${CONTROL_PORT_SSH} -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-session -d -s config \"
   cd \$HOME &&
