@@ -43,17 +43,23 @@ class SocialMediaUser(HttpUser):
         self.client.verify = False
 
     @events.request.add_listener
-    def on_request(response_time, context, **kwargs):
-        request_log_file.write(
-            json.dumps(
-                {
-                    "time": time.perf_counter(),
+    def on_request(response_time, context, exception, **kwargs):
+        if exception:
+            request_log_file.write(
+                json.dumps({
+                    "time": time.time(),
                     "latency": response_time,
                     "context": context,
-                }
-            )
-            + "\n"
-        )
+                    "failed": "True",
+                }) + "\n")
+        else:
+            request_log_file.write(
+                json.dumps({
+                    "time": time.time(),
+                    "latency": response_time,
+                    "context": context,
+                    "failed": "False",
+                }) + "\n")
 
     @task(600)
     def search_hotel(self):
@@ -73,18 +79,10 @@ class SocialMediaUser(HttpUser):
         lat = 38.0235 + (random.randint(0, 481) - 240.5) / 1000.0
         lon = -122.095 + (random.randint(0, 325) - 157.0) / 1000.0
 
-        path = (
-            "/hotels?inDate="
-            + in_date
-            + "&outDate="
-            + out_date
-            + "&lat="
-            + str(lat)
-            + "&lon="
-            + str(lon)
-        )
+        path = ("/hotels?inDate=" + in_date + "&outDate=" + out_date +
+                "&lat=" + str(lat) + "&lon=" + str(lon))
 
-        self.client.get(path, name="search")
+        self.client.get(path, name="search", context={"type": "search"})
 
     @task(390)
     def recommend(self):
@@ -99,14 +97,8 @@ class SocialMediaUser(HttpUser):
         lat = 38.0235 + (random.randint(0, 481) - 240.5) / 1000.0
         lon = -122.095 + (random.randint(0, 325) - 157.0) / 1000.0
 
-        path = (
-            "/recommendations?require="
-            + req_param
-            + "&lat="
-            + str(lat)
-            + "&lon="
-            + str(lon)
-        )
+        path = ("/recommendations?require=" + req_param + "&lat=" + str(lat) +
+                "&lon=" + str(lon))
 
         self.client.get(path, name="recommend", context={"type": "recommend"})
 
@@ -133,26 +125,11 @@ class SocialMediaUser(HttpUser):
 
         num_room = 1
 
-        path = (
-            "/reservation?inDate="
-            + in_date
-            + "&outDate="
-            + out_date
-            + "&lat="
-            + str(lat)
-            + "&lon="
-            + str(lon)
-            + "&hotelId="
-            + hotel_id
-            + "&customerName="
-            + user_name
-            + "&username="
-            + user_name
-            + "&password="
-            + password
-            + "&number="
-            + str(num_room)
-        )
+        path = ("/reservation?inDate=" + in_date + "&outDate=" + out_date +
+                "&lat=" + str(lat) + "&lon=" + str(lon) + "&hotelId=" +
+                hotel_id + "&customerName=" + user_name + "&username=" +
+                user_name + "&password=" + password + "&number=" +
+                str(num_room))
 
         self.client.post(path, name="reserve", context={"type": "reserve"})
 
@@ -161,7 +138,7 @@ class SocialMediaUser(HttpUser):
         user_name, password = get_user()
         path = "/user?username=" + user_name + "&password=" + password
 
-        self.client.get(path, name="user", context={"type": "user_login"})
+        self.client.get(path, name="user", context={"type": "user"})
 
 
 RPS = list(map(int, Path("rps.txt").read_text().splitlines()))

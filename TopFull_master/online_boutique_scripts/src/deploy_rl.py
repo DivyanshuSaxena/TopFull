@@ -80,7 +80,7 @@ def run_agent(agent, event):
 class Agent:
     def __init__(self, target_apis, algo, interval=2, alpha=0.9, ttl=15000, code='online_boutique'):
         self.target_apis = target_apis
-        self.collector = Collector(code=code)
+        self.collector = Collector(code=code, type="grpc")
         self.interval = interval
         self.alpha = alpha
         self.terminate = False
@@ -114,12 +114,16 @@ class Agent:
         clean_apis = []
         rps = self.detector.current_rps()
 
-        metric = self.collector.query()
+        metric = self.collector.query_grpc()
         latencys = []
         for api in self.target_apis:
             # api_rps, api_fail, api_latency, _ = metric[api]
-            api_rps, api_fail, api_latency = metric[api]
-            latencys.append(api_latency)
+            # api_rps, api_fail, api_latency = metric[api]
+            if api not in metric:
+                continue
+
+            _, api_latency99, api_fail, api_rps = metric[api]
+            latencys.append(api_latency99)
             goodput += api_rps - api_fail
 
             if api_fail <= 0.1 * api_rps and self.detector.apis[api]['threshold'] >= rps.get(api) or rps.get(api) == 0:
@@ -250,7 +254,7 @@ while True:
 
 
                 for api in disaggregate_apis:
-                    new_agent = Agent([], algo, interval=1, code=global_config["microservice_code"])
+                    new_agent = Agent([], algo, interval=5, code=global_config["microservice_code"])
                     new_event = threading.Event()
                     new_event.set()
                     tid = threading.Thread(target=run_agent, args=(new_agent, new_event))
@@ -260,7 +264,7 @@ while True:
                     new_agent.add_apis_with_threshold([(api, current_agent[i][0].detector.apis[api]['threshold'])])
                     new_event.clear()
                 
-                new_agent = Agent([], algo, interval=1, code=global_config["microservice_code"])
+                new_agent = Agent([], algo, interval=5, code=global_config["microservice_code"])
                 new_event = threading.Event()
                 new_event.set()
                 tid = threading.Thread(target=run_agent, args=(new_agent, new_event))
@@ -331,7 +335,7 @@ while True:
         # Case 3: All apis in the cluster don't exist in any agent
         # Action: Create a new agent with the cluster
         elif len(valid_agent) == 0:
-            new_agent = Agent(cluster_apis, algo, code=global_config["microservice_code"], interval=1) 
+            new_agent = Agent(cluster_apis, algo, code=global_config["microservice_code"], interval=5) 
             new_event = threading.Event()
             tid = threading.Thread(target=run_agent, args=(new_agent, new_event))
             tid.start()

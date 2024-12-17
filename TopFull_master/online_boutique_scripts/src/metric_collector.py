@@ -6,12 +6,26 @@ import csv
 import os
 
 import json
+import grpc
+
+from protos import collector_pb2
+from protos import collector_pb2_grpc
+
 global_config_path = os.environ["GLOBAL_CONFIG_PATH"]
 with open(global_config_path, "r") as f:
     global_config = json.load(f)
 
 class Collector:
-    def __init__(self, code="online_boutique"):
+    def __init__(self, code="online_boutique", type="http"):
+        # If type is `grpc`, then start a grpc stub and use it to collect metrics.
+        if type == "grpc":
+            locust_ip = global_config["locust_url"]
+            # For grpc, remove `http://` from the locust url.
+            locust_ip = locust_ip.replace("http://", "")
+            channel = grpc.insecure_channel(locust_ip + ":50051")
+            self.stub = collector_pb2_grpc.LatencyCollectorStub(channel)
+            self.last_query_time = time.time()
+
         if code == "online_boutique":
             self.code = [
                 ("GET", "getcart", 8888),
@@ -85,6 +99,23 @@ class Collector:
             # result[name] = (result[name][0], result[name][1], result[name][2], result[name][3])
         return result
 
+    def query_grpc(self):
+        # Get the per-request-type latency stats from locust -- using the gRPC client.
+        period = int(time.time() - self.last_query_time)
+
+        print(f"Querying latency stats for period {period} seconds.")
+        latency_request = collector_pb2.LatencyRequest()
+        latency_request.period = period
+        latency_request.start_time = int(self.last_query_time)
+        response = self.stub.GetLatencyStats(latency_request)
+
+        result = {}
+        for data in response.data:
+            result[data.type] = [data.p95, data.p99, data.failed, data.total]
+        self.last_query_time = time.time()
+
+        return result
+
 
 def record_train_ticket():
     collector = Collector(code="train_ticket")
@@ -138,7 +169,6 @@ def record_train_ticket():
                 w1.writerow(goodputs)
                 w2.writerow(thresholds)
 
-            
 def record_all():
     c = Collector(code=global_config["microservice_code"])
     apis = global_config["record_target"]
@@ -173,6 +203,8 @@ def record_all():
 
         for i, api in enumerate(apis):
             # rps, fail, latency95, latency99 = metric[api]
+            if api not in metric:
+                continue
             rps, fail, latency95 = metric[api]
             latency99 = 0
             total_rps += rps
@@ -188,10 +220,83 @@ def record_all():
             w.writerow([total_rps, total_fail, total_rps-total_fail, total_latency95/len(apis), total_latency99/len(apis)])
         out = ""
         for api in apis:
-            out += f"{api}={total_goodput[api]}   "
+            if api in total_goodput:
+                out += f"{api}={total_goodput[api]}   "
+            else:
+                out += f"{api}=0   "
         print(out)
 
+def record_grpc():
+    c = Collector(code=global_config["microservice_code"], type="grpc")
+    apis = global_config["record_target"]
+    log_path = global_config["record_path"]
+
+    # Make the log directory if it doesn't exist.
+    if not os.path.exists(log_path):
+        os.makedirs(log_path)
+
+    # Init
+    api_filenames = {}
+    for api in apis:
+        filename = os.path.join(log_path, api + ".csv")
+        if os.path.exists(filename):
+            os.remove(filename)
+
+        api_filenames[api] = filename
+        with open(filename, "a") as f:
+            w = csv.writer(f)
+            w.writerow(["RPS", "Fail", "Goodput", "Latency95", "Latency99"])
+    print(f"{api_filenames} created.")
+    
+    total_filename = os.path.join(log_path, "total.csv")
+    if os.path.exists(total_filename):
+        os.remove(total_filename)
+    with open(total_filename, "a") as f:
+        w = csv.writer(f)
+        w.writerow(["RPS", "Fail", "Goodput", "Latency95", "Latency99"])
+
+    # Query every one minute.
+    period = 60
+    while True:
+        print(f"Sleeping for {period} seconds.")
+        time.sleep(period)
+        metric = c.query_grpc()
+        print(f"Received metrics")
+        total_goodput = {}
+        total_rps = 0
+        total_fail = 0
+        total_latency95 = 0
+        total_latency99 = 0
+
+        for i, api in enumerate(apis):
+            # rps, fail, latency95, latency99 = metric[api]
+            if api not in metric:
+                latency95, latency99, fail, rps = 0, 0, 0, 0
+            else:
+                latency95, latency99, fail, rps = metric[api]
+
+            total_rps += rps / period
+            total_fail += fail / period
+            total_latency95 += latency95
+            total_latency99 += latency99
+            with open(api_filenames[api], "a") as f:
+                w = csv.writer(f)
+                w.writerow([rps, fail, rps-fail, latency95, latency99])
+                total_goodput[api] = rps - fail
+        with open(total_filename, "a") as f:
+            w = csv.writer(f)
+            w.writerow([total_rps, total_fail, total_rps-total_fail, total_latency95/len(apis), total_latency99/len(apis)])
+        
+        print("Written to api and total files.")
+        
+        out = ""
+        for api in apis:
+            if api in total_goodput:
+                out += f"{api}={total_goodput[api]}   "
+            else:
+                out += f"{api}=0   "
+        print(out)
 
 import csv
 if __name__ == "__main__":
-    record_all()
+    record_grpc()

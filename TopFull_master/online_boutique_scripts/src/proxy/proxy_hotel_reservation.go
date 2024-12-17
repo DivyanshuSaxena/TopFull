@@ -104,6 +104,10 @@ func init() {
 
 	limitDir = global_config.ProxyDir
 
+	// Make limitDir if not exist
+	if _, err := os.Stat(limitDir); os.IsNotExist(err) {
+		os.Mkdir(limitDir, 0755)
+	}
 	
 	for _, elem := range global_config.TargetAPI {
 		limiterTable[elem] = rate.NewLimiter(10000, 10000)
@@ -121,7 +125,8 @@ func init() {
 func monitorRPS() {
 	fmt.Printf("Start monitoring\n")
 	for true {
-		time.Sleep(1 * time.Second)
+		// Monitor every 5 seconds to reduce logging overhead and space.
+		time.Sleep(5 * time.Second)
 		fmt.Printf("-------------------------\n")
 		for _, elem := range global_config.TargetAPI {
 			fmt.Printf("%s: %.1f ", elem, mapStats[elem].currentRPS())
@@ -167,7 +172,7 @@ func changeLimitDelta() {
 		
 		targetLimiter.SetLimit(rate.Limit(newRateFloat))
 		targetLimiter.SetBurst(int(newRateFloat))
-		println("Apply threshold to ", api, " : ", newRateFloat)
+		println("Apply threshold to ", api, " : ", int(newRateFloat))
 		os.Remove(limitDir + api)
 	}
 }
@@ -205,7 +210,7 @@ func changeLimitAbs() {
 		
 		targetLimiter.SetLimit(rate.Limit(float64(newRate)))
 		targetLimiter.SetBurst(int(newRate))
-		println("Apply threshold to ", api, " : ", newRate)
+		println("Apply threshold to ", api, " : ", int(newRate))
 		os.Remove(limitDir + api)
 	}
 }

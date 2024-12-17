@@ -165,10 +165,10 @@ class Detector:
     def detect(self, alpha=0.9):
         # Fetch CPU quota and CPU usage of all services
         result = []
-        resources = self.get_cpu_util_v2(list(self.services.keys()))
+        resources = self.get_cpu_util(list(self.services.keys()))
         print("Resource usage: ", resources)
         for svc in list(resources.keys()):
-            usage = resources[svc]
+            usage = resources[svc]['cpu']
             quota = self.services[svc]['cpu']
             if svc == "productcatalogservice" or svc == "cartservice":
                 target = 0.95
@@ -231,7 +231,7 @@ class Detector:
             if out[0] == 'NAME':
                 continue
             
-            name = out[0].split('-')[0]
+            name = '-'.join(out[0].split('-')[:-2])
             cpu = int(out[1][:-1])
             if name in targets:
                 if cpu < 20:
