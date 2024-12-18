@@ -25,11 +25,14 @@ message LatencyStatsData {
   string type = 1;
   float p95 = 2;
   float p99 = 3;
-  float total = 4;
-  float failed = 5;
+  float total_rps = 4;
+  float failed_rps = 5;
+  float num_violations = 6;
 }
 
 message LatencyData {
   string type = 1;
-  repeated float latencies = 2;
+  float total_rps = 2;
+  float failed_rps = 3;
+  repeated float latencies = 4;
 }

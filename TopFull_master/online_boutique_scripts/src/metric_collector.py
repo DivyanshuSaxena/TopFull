@@ -8,6 +8,7 @@ import os
 import json
 import grpc
 
+import certificates
 from protos import collector_pb2
 from protos import collector_pb2_grpc
 
@@ -16,7 +17,7 @@ with open(global_config_path, "r") as f:
     global_config = json.load(f)
 
 class Collector:
-    def __init__(self, code="online_boutique", type="http"):
+    def __init__(self, code="online_boutique", type="http", use_certificates=False):
         # If type is `grpc`, then start a grpc stub and use it to collect metrics.
         if type == "grpc":
             locust_ip = global_config["locust_url"]
@@ -60,6 +61,9 @@ class Collector:
         else:
             self.code = code
 
+        # Set whether to use certificates.
+        self.use_certificates = use_certificates
+
     def query(self, port=8888):
         """
         Query metrics
@@ -99,7 +103,7 @@ class Collector:
             # result[name] = (result[name][0], result[name][1], result[name][2], result[name][3])
         return result
 
-    def query_grpc(self):
+    def query_grpc(self, only_stats=False, delta=0.1, alpha=1):
         # Get the per-request-type latency stats from locust -- using the gRPC client.
         period = int(time.time() - self.last_query_time)
 
@@ -107,15 +111,28 @@ class Collector:
         latency_request = collector_pb2.LatencyRequest()
         latency_request.period = period
         latency_request.start_time = int(self.last_query_time)
-        response = self.stub.GetLatencyStats(latency_request)
-
+        
         result = {}
-        for data in response.data:
-            result[data.type] = [data.p95, data.p99, data.failed, data.total]
-        self.last_query_time = time.time()
+        if only_stats:
+            # Query only the statistics - used by the metric collector, when all latencies are not needed.
+            response = self.stub.GetLatencyStats(latency_request)
+            for data in response.data:
+                result[data.type] = [data.p95, data.p99, data.failed_rps, data.total_rps, data.num_violations]
+            self.last_query_time = time.time()
+        else:
+            # Query statistics as well as all latencies in the time period.
+            response = self.stub.CollectAllLatencies(latency_request)
+            for data in response.data:
+                if self.use_certificates:
+                    # Compute the certificates.
+                    _, fitted_99p, _, cert = certificates.compute_gamma_certificates(
+                        data.latencies, delta, alpha
+                    )
+                    result[data.type] = [data.p95, data.p99, data.failed_rps, data.total_rps, cert]
+                else:
+                    result[data.type] = [data.p95, data.p99, data.failed_rps, data.total_rps]
 
         return result
-
 
 def record_train_ticket():
     collector = Collector(code="train_ticket")
@@ -245,7 +262,7 @@ def record_grpc():
         api_filenames[api] = filename
         with open(filename, "a") as f:
             w = csv.writer(f)
-            w.writerow(["RPS", "Fail", "Goodput", "Latency95", "Latency99"])
+            w.writerow(["RPS", "Fail", "Goodput", "Latency95", "Latency99", "Violations"])
     print(f"{api_filenames} created.")
     
     total_filename = os.path.join(log_path, "total.csv")
@@ -253,14 +270,23 @@ def record_grpc():
         os.remove(total_filename)
     with open(total_filename, "a") as f:
         w = csv.writer(f)
-        w.writerow(["RPS", "Fail", "Goodput", "Latency95", "Latency99"])
+        w.writerow(["RPS", "Fail", "Goodput", "Latency95", "Latency99", "AggViolations"])
+
+    # Measure aggregated violations.
+    total_violations = 0
+    total_count = 0
+    svc_violations = {}
+    svc_count = {}
+    for api in apis:
+        svc_violations[api] = 0
+        svc_count[api] = 1
 
     # Query every one minute.
     period = 60
     while True:
         print(f"Sleeping for {period} seconds.")
         time.sleep(period)
-        metric = c.query_grpc()
+        metric = c.query_grpc(only_stats=True)
         print(f"Received metrics")
         total_goodput = {}
         total_rps = 0
@@ -271,22 +297,28 @@ def record_grpc():
         for i, api in enumerate(apis):
             # rps, fail, latency95, latency99 = metric[api]
             if api not in metric:
-                latency95, latency99, fail, rps = 0, 0, 0, 0
+                latency95, latency99, fail, rps, violations = 0, 0, 0, 0, 0
             else:
-                latency95, latency99, fail, rps = metric[api]
+                latency95, latency99, fail, rps, violations = metric[api]
+                svc_violations[api] += violations
+                svc_count[api] += rps * period
 
-            total_rps += rps / period
-            total_fail += fail / period
+            total_rps += rps
+            total_fail += fail
             total_latency95 += latency95
             total_latency99 += latency99
+            total_count += rps * period
+            total_violations += violations
+
             with open(api_filenames[api], "a") as f:
                 w = csv.writer(f)
-                w.writerow([rps, fail, rps-fail, latency95, latency99])
+                w.writerow([rps, fail, rps-fail, latency95, latency99, svc_violations[api]/svc_count[api]])
                 total_goodput[api] = rps - fail
+
         with open(total_filename, "a") as f:
             w = csv.writer(f)
-            w.writerow([total_rps, total_fail, total_rps-total_fail, total_latency95/len(apis), total_latency99/len(apis)])
-        
+            w.writerow([total_rps, total_fail, total_rps-total_fail, total_latency95/len(apis), total_latency99/len(apis), total_violations/total_count])
+
         print("Written to api and total files.")
         
         out = ""

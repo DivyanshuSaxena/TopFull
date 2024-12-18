@@ -145,11 +145,13 @@ class LatencyCollectorServicer(collector_pb2_grpc.LatencyCollectorServicer):
             lat_obj = collector_pb2.LatencyData()
             lat_obj.type = type
             lat_obj.latencies.extend(latency_data["latencies"])
+            lat_obj.total_rps = latency_data["total"] / period
+            lat_obj.failed_rps = latency_data["num_fails"] / period
+            response.data.append(lat_obj)
 
             num_latencies += len(latency_data["latencies"])
-            response.data.append(lat_obj)
-        print(f"Responding back with {num_latencies} latencies.")
 
+        print(f"Responding back with {num_latencies} latencies.")
         return response
 
     def GetLatencyStats(self, request, context):
@@ -170,9 +172,10 @@ class LatencyCollectorServicer(collector_pb2_grpc.LatencyCollectorServicer):
             else:
                 lat_obj.p95 = float(np.percentile(latency_data["latencies"], 95))
                 lat_obj.p99 = float(np.percentile(latency_data["latencies"], 99))
-            lat_obj.total = latency_data["total"] / period
-            lat_obj.failed = latency_data["num_fails"] / period
-            print(f"Type: {type}, failed: {lat_obj.failed}, total: {lat_obj.total}")
+            lat_obj.total_rps = latency_data["total"] / period
+            lat_obj.failed_rps = latency_data["num_fails"] / period            
+            lat_obj.num_violations = len([lat for lat in latency_data["latencies"] if lat > 100])
+            print(f"Type: {type}, failed: {lat_obj.failed_rps}, total: {lat_obj.total_rps}")
             response.data.append(lat_obj)
 
         return response

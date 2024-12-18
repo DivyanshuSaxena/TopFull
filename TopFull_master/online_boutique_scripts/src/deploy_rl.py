@@ -20,6 +20,11 @@ MAX_STEPS = 50
 addstep = 5
 mulstep = 0.1
 
+# Certificates hyperparameters
+delta = 0.1
+alpha = 1
+use_certificates = False
+
 class MyEnv(gym.Env):
     def __init__(self, env_config):
         self.action_space = gym.spaces.Box(low=np.array([-0.5]), high=np.array([0.5]), dtype=np.float32)
@@ -122,7 +127,9 @@ class Agent:
             if api not in metric:
                 continue
 
-            _, api_latency99, api_fail, api_rps = metric[api]
+            api_latency99 = metric[api][1]
+            api_fail = metric[api][2]
+            api_rps = metric[api][3]
             latencys.append(api_latency99)
             goodput += api_rps - api_fail
 
@@ -239,6 +246,11 @@ if os.path.exists(log_path + "num_agent.csv"):
     os.remove(log_path+"num_agent.csv")
 if os.path.exists(log_path + "execution_time.csv"):
     os.remove(log_path+"execution_time.csv")
+
+# Read delta from the argument, if provided.
+if len(sys.argv) > 1:
+    use_certificates = True
+    delta = float(sys.argv[1])
 
 # Start Loop
 while True:
