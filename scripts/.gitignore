@@ -1,2 +1,8 @@
 # Ignore the trace files
 *.txt
+
+# Ignore figures
+**/figures/**
+
+# Pycache
+**/__pycache__/
