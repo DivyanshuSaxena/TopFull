@@ -7,6 +7,7 @@ Args:
 import os
 import sys
 import json
+import numpy as np
 import matplotlib.pyplot as plt
 
 from utils import *
@@ -33,9 +34,15 @@ fig, axes = plt.subplots(2, 1, figsize=(12, 8))
 # Plot the total failed and goodputs.
 axes[0].plot(failed, label="Failed", linestyle='dashed')
 axes[0].plot(goodput, label="Goodput", linewidth=2)
+axes[0].minorticks_on()
+axes[0].grid(which='major', linestyle='-', linewidth='0.5', color='black')
+axes[0].grid(which='minor', linestyle=':', linewidth='0.5', color='black')
 axes[0].legend()
 axes[0].set_ylabel("Rate")
 axes[0].set_xlabel("Time (min)")
+
+# Print average goodput.
+print(f"Average goodput: {np.average(goodput)}")
 
 # Plot the latencies.
 for i in range(num_types):

@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
-# 1: Name of the experiment
-# 2: Workload
+# $1: Name of the experiment
+# $2: Experiment type (galileo/...)
 # $3: application (reservation/social)
 # $4: workload
-# $5: delta (change in environment)
-# $6: eta (regulate weight of certificate cost)
-# $7: results directory
-# $8: if stress (stress/nostress) - Optional
+# $5: results directory
+# $6: checkpoint to use - Optional (if not provided, use the base checkpoint)
+# $7: if stress (stress/nostress) - Optional
 
-# Check if there are at least 7 arguments
-if [[ $# -lt 7 ]]; then
-  echo "Usage: $0 <experiment_name> <experiment_type> <application> <workload> <delta> <eta> <results_dir> <if_stress>"
+# Check if there are at least 5 arguments
+if [[ $# -lt 5 ]]; then
+  echo "Usage: $0 <experiment_name> <experiment_type> <application> <workload> <results_dir> [<checkpoint-path>] [<if_stress>]"
   exit 1
 fi
 
@@ -18,18 +17,19 @@ EXP_NAME=$1
 EXP_TYPE=$2
 APP=$3
 WORKLOAD=$4
-DELTA=$5
-ETA=$6
-IF_STRESS=${8:-"nostress"}
+CHECKPOINT_PATH=${6:-""}
+IF_STRESS=${7:-"nostress"}
 
-# Results directory depends on the experiment type
-if [[ $EXP_TYPE == *"galileo"* ]]; then
-  RESULTS_DIR=${APP}/${EXP_TYPE}-${WORKLOAD}-d${DELTA}-e${ETA}-${IF_STRESS}-$(date +%d%m-%H%M)
+# If CHECKPOINT_PATH is not "", split by '/' and get the third last element.
+if [[ $CHECKPOINT_PATH != "" ]]; then
+  CHECKPOINT=$(echo $CHECKPOINT_PATH | tr "/" "\n" | tail -3 | head -1)
 else
-  RESULTS_DIR=${APP}/${EXP_TYPE}-${WORKLOAD}-${IF_STRESS}-$(date +%d%m-%H%M)
+  CHECKPOINT="base"
 fi
-LOCAL_RESULTS_DIR=$7/${RESULTS_DIR}
-CLOUDLAB_RESULTS_DIR=/proj/wisr-PG0/galileo/${RESULTS_DIR}
+
+RESULTS_DIR=${APP}/${EXP_TYPE}-${WORKLOAD}-${IF_STRESS}-$(date +%d%m-%H%M)
+LOCAL_RESULTS_DIR=$5/${RESULTS_DIR}-${CHECKPOINT}
+CLOUDLAB_RESULTS_DIR=/proj/wisr-PG0/galileo/${RESULTS_DIR}-${CHECKPOINT}
 
 mapfile -t HOSTS < <(./cloudlab/nodes.sh ${EXP_NAME} 0 4 --all)
 
@@ -49,7 +49,7 @@ sleep 5
 ssh -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-session -d -s rl \"
   cd \$HOME/TopFull_master/online_boutique_scripts/src &&
   export GLOBAL_CONFIG_PATH=~/TopFull_master/online_boutique_scripts/src/global_config_reservation.json &&
-  python3 deploy_rl.py > \$HOME/out/rl.out 2>&1
+  python3 deploy_rl.py ${CHECKPOINT_PATH} > \$HOME/out/rl.out 2>&1
 \""
 
 sleep 5
@@ -75,7 +75,7 @@ fi
 ssh -o StrictHostKeyChecking=no $CLIENT_NODE "tmux new-session -d -s workload \"
   export PATH=\$HOME/.local/bin:\$PATH &&
   cd \$HOME/TopFull_loadgen &&
-  python3 execute_workload.py ~/out/ locust_reservation.py http://10.10.1.1:32000 1 1 ${WORKLOAD} > ~/out/workload.out 2>&1
+  python3 execute_workload.py ~/out/ locust_reservation.py http://10.10.1.1:32000 10 1 ${WORKLOAD} > ~/out/workload.out 2>&1
 \""
 
 # Sleep for an hour.
