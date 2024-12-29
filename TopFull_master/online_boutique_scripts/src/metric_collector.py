@@ -7,6 +7,7 @@ import os
 
 import json
 import grpc
+import numpy as np
 
 import certificates
 from protos import collector_pb2
@@ -64,6 +65,9 @@ class Collector:
         # Set whether to use certificates.
         self.use_certificates = use_certificates
 
+        # Save the last stats if queried too quickly.
+        self.last_stats = None
+
     def query(self, port=8888):
         """
         Query metrics
@@ -106,6 +110,8 @@ class Collector:
     def query_grpc(self, only_stats=False, delta=0.1, alpha=1):
         # Get the per-request-type latency stats from locust -- using the gRPC client.
         period = int(time.time() - self.last_query_time)
+        if period == 0:
+            return self.last_stats
 
         print(f"Querying latency stats for period {period} seconds.")
         latency_request = collector_pb2.LatencyRequest()
@@ -118,20 +124,27 @@ class Collector:
             response = self.stub.GetLatencyStats(latency_request)
             for data in response.data:
                 result[data.type] = [data.p95, data.p99, data.failed_rps, data.total_rps, data.num_violations]
-            self.last_query_time = time.time()
         else:
             # Query statistics as well as all latencies in the time period.
             response = self.stub.CollectAllLatencies(latency_request)
             for data in response.data:
+                p95 = float(np.percentile(data.latencies, 95))
+                p99 = float(np.percentile(data.latencies, 99))
+
                 if self.use_certificates:
                     # Compute the certificates.
-                    _, fitted_99p, _, cert = certificates.compute_gamma_certificates(
-                        data.latencies, delta, alpha
-                    )
-                    result[data.type] = [data.p95, data.p99, data.failed_rps, data.total_rps, cert]
+                    try:
+                        _, fitted_99p, _, cert = certificates.compute_gamma_certificates(
+                            data.latencies, delta, alpha
+                        )
+                        result[data.type] = [p95, p99, data.failed_rps, data.total_rps, cert]
+                    except:
+                        result[data.type] = [p95, p99, data.failed_rps, data.total_rps, p99]
                 else:
-                    result[data.type] = [data.p95, data.p99, data.failed_rps, data.total_rps]
+                    result[data.type] = [p95, p99, data.failed_rps, data.total_rps]
 
+        self.last_stats = result
+        self.last_query_time = time.time()
         return result
 
 def record_train_ticket():

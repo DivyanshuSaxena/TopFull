@@ -154,5 +154,9 @@ ssh ${CONTROL_PORT_SSH} -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-sess
   echo 'export PATH=\$PATH:/usr/local/go/bin' >> ~/.bashrc &&
   rm go1.20.7.linux-amd64.tar.gz &&
 
+  pushd \$HOME/TopFull_master/online_boutique_scripts/src &&
+  python3 -m grpc_tools.protoc -I=. --python_out=. --grpc_python_out=. protos/collector.proto &&
+  popd &&
+
   mkdir -p \$HOME/out &&
   mkdir -p \$HOME/logs\""

@@ -66,6 +66,7 @@ for i in "${!HOSTS[@]}"; do
     popd &&
 
     pushd TopFull_loadgen &&
+    python3 -m pip install -r requirements.txt &&
     python3 -m grpc_tools.protoc -I=. --python_out=. --grpc_python_out=. protos/collector.proto &&
     popd &&
 

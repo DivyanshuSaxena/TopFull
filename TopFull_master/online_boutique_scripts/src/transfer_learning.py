@@ -1,7 +1,8 @@
 import gym, ray
 from ray.rllib.algorithms import ppo
 
-import random
+import os
+import sys
 import numpy as np
 from skeleton_simulator import *
 # from multi_api_simulator import *
@@ -10,35 +11,48 @@ from overload_detection import *
 import time
 
 
+SLO = 100
+MAX_STEPS = 10
 
-N_DISCRETE_ACTIONS = 5
-feature = 2
-MAX_STEPS = 50
-
-#collector = Collector(code="online_boutique")
-target_api = "query_order"
+# Parameters not used - only for compatibility with the original code.
+addstep = 5
+mulstep = 0.1
 
 class MyEnv(gym.Env):
     def __init__(self, env_config):
         self.action_space = gym.spaces.Box(low=np.array([-0.5]), high=np.array([0.5]), dtype=np.float32)
         self.observation_space = gym.spaces.Box(low=np.array([-2000.0, -1000.0]), high=np.array([2000.0, 50000.0]), dtype=np.float32)
         self.MAX_STEPS = MAX_STEPS
+        self.application = env_config["application"]
+        self.target_api = env_config["target_api"]
+        self.period = env_config["period"]
+        self.use_certificates = env_config["use_certificates"]
 
     def reset(self):
         self.detector = Detector()
-        self.collector = Collector(code="train_ticket")
-        self.ts = Simulator()
-        self.detector.apis[target_api]['threshold'] = 1000
-        self.detector.reset([target_api])
+        self.collector = Collector(code=self.application, type="grpc", use_certificates=self.use_certificates)
+        self.ts = Simulator(addstep, mulstep)
+        self.detector.apis[self.target_api]['threshold'] = 1000
+        self.detector.reset([self.target_api])
         time.sleep(5)
 
         self.count = 0
-        metric = self.collector.query()
-        rps, fail, init_latency = metric[target_api]
+        metric = self.collector.query_grpc(only_stats=True)
+        if self.target_api not in metric:
+            self.state = np.array([0, 100])
+            self.reward = 0
+            self.done = False
+            self.info = {}
+            return self.state
 
-        self.detector.apis[target_api]['threshold'] = rps
+        # rps, fail, init_latency = metric[self.target_api]
+        init_latency = metric[self.target_api][1]
+        fail = metric[self.target_api][2]
+        rps = metric[self.target_api][3]
+
+        self.detector.apis[self.target_api]['threshold'] = rps
         self.threshold = rps
-        self.detector.reset([target_api])
+        self.detector.reset([self.target_api])
         self.goodput = rps - fail
 
         self.state = np.array([(rps - fail)/rps, init_latency])
@@ -51,13 +65,22 @@ class MyEnv(gym.Env):
         if self.done:
             print("EPISODE DONE!!!") 
         elif self.count == self.MAX_STEPS:
-
+            print("Setting done to True.")
             self.done = True
         else:
             self.count += 1
-            metric = self.collector.query()
-            rps, fail, latency = metric[target_api]
-            tmpGoodput = rps - fail
+            print(f"Step {self.count} completed.")
+
+            # This first query is just to get the initial stats -- query only for stats.
+            metric = self.collector.query_grpc(only_stats=True)
+            if self.target_api in metric:
+                latency = metric[self.target_api][1]
+                fail = metric[self.target_api][2]
+                rps = metric[self.target_api][3]
+                tmpGoodput = rps - fail
+            else:
+                rps = 1000
+                tmpGoodput = -1
 
             new_threshold = (1 + float(action)) * self.threshold
             if new_threshold <= 10:
@@ -65,43 +88,107 @@ class MyEnv(gym.Env):
             if new_threshold > rps * 1.1:
                 new_threshold = rps * 1.1
 
-            self.detector.apis[target_api]['threshold'] = new_threshold
-            apply_threshold_proxy([self.detector.apis[target_api]])
+            self.detector.apis[self.target_api]['threshold'] = new_threshold
+            apply_threshold_proxy([self.detector.apis[self.target_api]])
 
-            time.sleep(1)
+            time.sleep(self.period)
 
-            metric = self.collector.query()
-            rps, fail, latency = metric[target_api]
-            self.goodput = rps - fail
+            metric = self.collector.query_grpc()
+            if self.target_api in metric:
+                latency = metric[self.target_api][1]
+                fail = metric[self.target_api][2]
+                rps = metric[self.target_api][3]
 
-            deltaGoodput = self.goodput - tmpGoodput
-            self.threshold = self.detector.apis[target_api]['threshold']
-            
-            goodputPerThres = self.goodput/self.threshold
+                self.goodput = rps - fail
+                if tmpGoodput == -1:
+                    deltaGoodput = 0
+                else:
+                    deltaGoodput = self.goodput - tmpGoodput
+
+                self.threshold = self.detector.apis[self.target_api]['threshold']
+                goodputPerThres = self.goodput/self.threshold
+
+                if self.use_certificates:
+                    cert = metric[self.target_api][4]
+                    print(f"Lat/Cert Compaison: {goodputPerThres}, {latency}, {cert}")
+            else:
+                goodputPerThres = 1
+                deltaGoodput = 0
+                latency = SLO
+                cert = SLO
 
             self.state = np.array([goodputPerThres, latency])
             self.reward = deltaGoodput
-            if latency > 1000:
-                self.reward -= latency*0.01
- 
+
+            if self.use_certificates:
+                if cert > SLO:
+                    self.reward -= cert*0.01
+            else:
+                if latency > SLO:
+                    self.reward -= latency*0.01
 
         return self.state, self.reward, self.done, self.info
 
 
+# Get the application from the command line.
+if len(sys.argv) < 4:
+    print("Usage: python transfer_learning.py <application> <period> <use_certificates (0/1)>")
+    sys.exit(1)
 
-ray.init()
-algo = ppo.PPO(env=MyEnv, config={
-    "env_config": {},  # config to pass to env class
-    'num_workers': 0,
-})
-checkpoint_path = "./checkpoint_000701"
-algo.restore(checkpoint_path)
+application = sys.argv[1]
+period = int(sys.argv[2])
+use_certificates = int(sys.argv[3]) == 1
 
+# If the application is reservation, change it to hotel_reservation.
+if application == "reservation":
+    application = "hotel_reservation"
 
-_ = 0
-while True:
-    if _ % 1 == 0:
-        algo.save("./models_transfer/v1tmp1/rllib_checkpoint")
-        print(_)
-    _ += 1
-    print(algo.train()['episode_reward_mean'])
+global_config_path = os.environ["GLOBAL_CONFIG_PATH"]
+with open(global_config_path, "r") as f:
+    global_config = json.load(f)
+
+# Read all target_apis from the config and redo the training for each of them.
+target_apis = global_config["record_target"]
+
+for target_api in target_apis:
+    # Only execute for the popular APIs (search and recommend)
+    if target_api not in ["search", "recommend"]:
+        continue
+
+    ray.init()
+    algo = ppo.PPO(env=MyEnv, config={
+        "env_config": {
+            "application": application,
+            "target_api": target_api,
+            "period": period,
+            "use_certificates": use_certificates
+        },  # config to pass to env class
+        "num_workers": 1,
+        "train_batch_size": 32,
+        "sgd_minibatch_size": 16,
+    })
+    checkpoint_path = "./checkpoint_000701"
+    algo.restore(checkpoint_path)
+
+    save_path = f"./training/checkpoint_{application}_{target_api}_{period}"
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    total_eps = 25
+
+    _ = 0
+    while True:
+        if _ % 5 == 0:
+            algo.save(save_path)
+            print("Model saved.")
+        
+        if _ == total_eps:
+            print("Training completed.")
+            break
+
+        _ += 1
+        print("Training step started.")
+        print(algo.train()['episode_reward_mean'])
+        print(f"{_} training step completed.")
+
+    ray.shutdown()

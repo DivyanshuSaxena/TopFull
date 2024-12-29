@@ -242,8 +242,8 @@ if __name__ == '__main__':
         # Get the rate from rps - fixed_<rate>
         rate = int(rps.split('_')[1])
         with open(new_file, 'w') as f:
-            for _ in range(3600):
-                f.write(f"{rate * multiplier}")
+            for _ in range(8*3600):
+                f.write(f"{rate * multiplier}\n")
     else:
         rps_file = rps
         with open(rps_file, 'r') as f:
