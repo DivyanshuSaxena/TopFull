@@ -228,8 +228,8 @@ def with_locust(temp_dir, locustfile, url, workers):
 
 if __name__ == '__main__':
     # Check the number of arguments.
-    if len(sys.argv) != 7:
-        print('Usage: python execute_workload.py <temp_dir> <locustfile> <url> <workers> <multiplier> <rps (fixed_* or path to rps file)>')
+    if len(sys.argv) != 8:
+        print('Usage: python execute_workload.py <temp_dir> <locustfile> <url> <workers> <multiplier> <rps (fixed_* or path to rps file)> <for_training (0/1)>')
         sys.exit(1)
 
     # Multiply the rps by the given factor.
@@ -237,12 +237,16 @@ if __name__ == '__main__':
     multiplier = int(sys.argv[5])
     new_file = os.path.join(os.getcwd(), 'rps.txt')
 
+    # Duration is 1 hour if for eval, 8 hours if for training.
+    for_training = int(sys.argv[7]) == 1
+    duration = 8 if for_training else 1
+
     # If the rps_file is simply "fixed_*", then use a fixed workload.
     if "fixed" in rps:
         # Get the rate from rps - fixed_<rate>
         rate = int(rps.split('_')[1])
         with open(new_file, 'w') as f:
-            for _ in range(8*3600):
+            for _ in range(duration*3600):
                 f.write(f"{rate * multiplier}\n")
     else:
         rps_file = rps
@@ -250,8 +254,11 @@ if __name__ == '__main__':
             lines = f.readlines()
 
         new_lines = [str(int(line) * multiplier) for line in lines]
+
         with open(new_file, 'w') as f:
-            f.write('\n'.join(new_lines))
+            for _ in range(duration):
+                f.write('\n'.join(new_lines))
+                f.write('\n')
 
     # Start the gRPC server.
     serve_thread = threading.Thread(target=serve)

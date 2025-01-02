@@ -224,7 +224,7 @@ class Agent:
                 self.detector.apis[api]['threshold'] = 10000
             self.detector.reset(self.target_apis)
         self.terminate = True
-        self.detector.event.set()
+        # self.detector.event.set()
 
 
 # Check if a checkpoint path is provided as command line argument.

@@ -36,6 +36,22 @@ mapfile -t HOSTS < <(./cloudlab/nodes.sh ${EXP_NAME} 0 4 --all)
 CONTROL_NODE=${HOSTS[0]}
 CLIENT_NODE=${HOSTS[4]}
 
+# Start the background stress jobs.
+if [[ $IF_STRESS == "stress" ]]; then
+  echo "Start cpu stress on nodes 0-3"
+  for host in "${HOSTS[@]:0:4}" ; do
+    ssh -o StrictHostKeyChecking=no $host "tmux new-session -d -s cpu_bg \"
+      cd \$HOME/bg_stress &&
+      make &&
+      ./cpu_stress 16
+    \""
+    ssh -o StrictHostKeyChecking=no $host "tmux new-session -d -s cpu_monitor \"
+      cd \$HOME/bg_stress &&
+      python3 CPU_usage.py --no-plot
+    \""
+  done
+fi
+
 # Start tmux sessions on the control node - one for the proxy, another for rl, and third for metrics collection.
 ssh -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-session -d -s proxy \"
   cd \$HOME/TopFull_master/online_boutique_scripts/src/proxy &&
@@ -75,14 +91,14 @@ fi
 ssh -o StrictHostKeyChecking=no $CLIENT_NODE "tmux new-session -d -s workload \"
   export PATH=\$HOME/.local/bin:\$PATH &&
   cd \$HOME/TopFull_loadgen &&
-  python3 execute_workload.py ~/out/ locust_reservation.py http://10.10.1.1:32000 10 1 ${WORKLOAD} > ~/out/workload.out 2>&1
+  python3 execute_workload.py ~/out/ locust_reservation.py http://10.10.1.1:32000 10 1 ${WORKLOAD} 0 > ~/out/workload.out 2>&1
 \""
 
 # Sleep for an hour.
 echo "Sleeping for an hour"
 sleep 3660
 
-# TODO: Currently we do not start the CPU stress process.
+# Kill any running stress jobs.
 if [[ $IF_STRESS == "stress" ]]; then
   echo "Kill cpu stress on all nodes"
   for host in "${HOSTS[@]:0:4}" ; do
@@ -111,7 +127,12 @@ if [[ -n $WORKLOAD_STATUS ]]; then
   ssh -o StrictHostKeyChecking=no $CLIENT_NODE "ps aux | grep execute | awk '{print \$2}' | xargs kill -9"
 fi
 
-# TODO: Currently we do not get the CPU usage logs.
+# Get logs from the control node.
+echo "Getting logs from the control node"
+mkdir -p ${LOCAL_RESULTS_DIR}
+pushd ${LOCAL_RESULTS_DIR}
+scp -o StrictHostKeyChecking=no $CONTROL_NODE:~/TopFull_master/online_boutique_scripts/src/logs/* .
+
 if [[ $IF_STRESS == "stress" ]]; then
   # Get the CPU usage logs from the nodes
   index=0
@@ -121,12 +142,6 @@ if [[ $IF_STRESS == "stress" ]]; then
     ((index++))
   done
 fi
-
-# Get logs from the control node.
-echo "Getting logs from the control node"
-mkdir -p ${LOCAL_RESULTS_DIR}
-pushd ${LOCAL_RESULTS_DIR}
-scp -o StrictHostKeyChecking=no $CONTROL_NODE:~/TopFull_master/online_boutique_scripts/src/logs/* .
 
 # Also get all the out/* files from the control node and the client node.
 scp -o StrictHostKeyChecking=no $CONTROL_NODE:~/out/* .

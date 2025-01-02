@@ -91,10 +91,10 @@ class Detector:
         
         rps = self.current_rps()
 
-        self.event = threading.Event()
-        t = threading.Thread(target=run, args=(self.event,))
-        t.start()
-        self.tid = t
+        # self.event = threading.Event()
+        # t = threading.Thread(target=run, args=(self.event,))
+        # t.start()
+        # self.tid = t
 
         with open(config, "r") as f:
             data = json.load(f)
@@ -144,7 +144,7 @@ class Detector:
             self.services['ts-food-map-service']['cpu'] = 1000
         elif microservice_code == "hotel_reservation":
             # Hotel Reservation
-            self.services['frontend']['cpu'] = 500
+            self.services['frontend']['cpu'] = 1000
             self.services['search']['cpu'] = 500
             self.services['reservation']['cpu'] = 500
             self.services['recommendation']['cpu'] = 500

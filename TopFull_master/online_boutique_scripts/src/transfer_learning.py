@@ -3,6 +3,7 @@ from ray.rllib.algorithms import ppo
 
 import os
 import sys
+import math
 import numpy as np
 from skeleton_simulator import *
 # from multi_api_simulator import *
@@ -27,6 +28,8 @@ class MyEnv(gym.Env):
         self.target_api = env_config["target_api"]
         self.period = env_config["period"]
         self.use_certificates = env_config["use_certificates"]
+        self.reward_type = env_config["reward_type"]
+        self.threshold = 1000
 
     def reset(self):
         self.detector = Detector()
@@ -121,8 +124,13 @@ class MyEnv(gym.Env):
             self.reward = deltaGoodput
 
             if self.use_certificates:
-                if cert > SLO:
-                    self.reward -= cert*0.01
+                if self.reward_type == "regular":
+                    if cert > SLO:
+                        self.reward -= cert*0.01
+                elif self.reward_type == "sigmoid":
+                    if latency > SLO:
+                        self.reward -= latency*0.01
+                    self.reward -= 1 / (1 + math.exp(-0.1 * (cert - SLO)))
             else:
                 if latency > SLO:
                     self.reward -= latency*0.01
@@ -132,12 +140,19 @@ class MyEnv(gym.Env):
 
 # Get the application from the command line.
 if len(sys.argv) < 4:
-    print("Usage: python transfer_learning.py <application> <period> <use_certificates (0/1)>")
+    print("Usage: python transfer_learning.py <application> <period> <use_certificates (0/1)> <reward_type>")
     sys.exit(1)
 
 application = sys.argv[1]
 period = int(sys.argv[2])
 use_certificates = int(sys.argv[3]) == 1
+
+# Reward type is an optional parameter.
+# Only used for the certificate-based reward. For regular fine-tuning, keep it as "regular".
+if len(sys.argv) == 5:
+    reward_type = sys.argv[4]
+else:
+    reward_type = "regular"
 
 # If the application is reservation, change it to hotel_reservation.
 if application == "reservation":
@@ -161,7 +176,8 @@ for target_api in target_apis:
             "application": application,
             "target_api": target_api,
             "period": period,
-            "use_certificates": use_certificates
+            "use_certificates": use_certificates,
+            "reward_type": reward_type
         },  # config to pass to env class
         "num_workers": 1,
         "train_batch_size": 32,

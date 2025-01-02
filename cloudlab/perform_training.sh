@@ -33,6 +33,11 @@ if [[ $EXP_TYPE == *"galileo"* ]]; then
   USE_CERTIFICATES=1
 fi
 
+REWARD_TYPE=""
+if [[ $EXP_TYPE == *"sigmoid"* ]]; then
+  REWARD_TYPE="sigmoid"
+fi
+
 # Results directory depends on the experiment type
 RESULTS_DIR=${APP}/training-${EXP_TYPE}-$(date +%d%m-%H%M)
 LOCAL_RESULTS_DIR=$7/${RESULTS_DIR}
@@ -51,7 +56,7 @@ sleep 5
 ssh -o StrictHostKeyChecking=no $CONTROL_NODE "tmux new-session -d -s rl \"
   cd \$HOME/TopFull_master/online_boutique_scripts/src &&
   export GLOBAL_CONFIG_PATH=~/TopFull_master/online_boutique_scripts/src/global_config_reservation.json &&
-  python3 transfer_learning.py ${APP} 5 ${USE_CERTIFICATES} > \$HOME/out/transfer.out 2>&1
+  python3 transfer_learning.py ${APP} 5 ${USE_CERTIFICATES} ${REWARD_TYPE} > \$HOME/out/transfer.out 2>&1
 \""
 
 # Run the workload on the client node
@@ -69,7 +74,7 @@ fi
 ssh -o StrictHostKeyChecking=no $CLIENT_NODE "tmux new-session -d -s workload \"
   export PATH=\$HOME/.local/bin:\$PATH &&
   cd \$HOME/TopFull_loadgen &&
-  python3 execute_workload.py ~/out/ locust_reservation.py http://10.10.1.1:32000 10 1 ${WORKLOAD} > ~/out/workload.out 2>&1
+  python3 execute_workload.py ~/out/ locust_reservation.py http://10.10.1.1:32000 10 1 ${WORKLOAD} 1 > ~/out/workload.out 2>&1
 \""
 
 sleep 5
