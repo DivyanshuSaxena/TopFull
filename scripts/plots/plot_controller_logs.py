@@ -19,7 +19,6 @@ if len(sys.argv) < 2:
 
 log_dir = sys.argv[1]
 
-
 type_names = ["User", "Recommend", "Search", "Reserve"]
 num_types = len(type_names)
 
@@ -43,6 +42,12 @@ axes[0].set_xlabel("Time (min)")
 
 # Print average goodput.
 print(f"Average goodput: {np.average(goodput)}")
+
+# Print the Violations by type.
+violations_dict = {}
+for i in range(num_types):
+    violations_dict[type_names[i]] = violations[i]
+print(violations_dict)
 
 # Plot the latencies.
 for i in range(num_types):
